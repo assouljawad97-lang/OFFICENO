@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Officeno Admin Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Officeno Admin Manager</h1>
+    <nav>
+      <button data-view="dashboard">Dashboard</button>
+      <button data-view="add-client">Add Client</button>
+      <button data-view="client-list">Client List</button>
+      <button data-view="calendar">Calendar</button>
+      <button data-view="document-manager">Document Manager</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard" class="view"></section>
+
+    <section id="add-client" class="view hidden">
+      <h2>Add Client</h2>
+      <form id="client-form">
+        <div class="grid">
+          <label>Full Name<input required name="fullName" /></label>
+          <label>National ID or Passport Number<input required name="nationalId" /></label>
+          <label>Phone Number<input name="phone" /></label>
+          <label>Service Category
+            <select required name="category">
+              <option value="MOROCCAN_CONSULATE">Moroccan Consulate</option>
+              <option value="OTHER_SERVICES">Other Administrative Services</option>
+            </select>
+          </label>
+          <label>Appointment Date (optional)<input type="date" name="appointmentDate" /></label>
+          <label>Status
+            <select name="status">
+              <option value="WAITING_DOCUMENTS">Waiting Documents</option>
+              <option value="APPOINTMENT_BOOKED">Appointment Booked</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="PROBLEM_OR_MISSING_DOCUMENT">Problem / Missing Document</option>
+            </select>
+          </label>
+        </div>
+        <label>Service Description<textarea name="serviceDescription" required></textarea></label>
+        <label>Notes<textarea name="notes"></textarea></label>
+        <button type="submit">Create Client</button>
+      </form>
+      <p id="add-client-message"></p>
+    </section>
+
+    <section id="client-list" class="view hidden">
+      <h2>Client List</h2>
+      <div class="filters">
+        <input id="search-input" placeholder="Search by name, ID, phone, service" />
+        <select id="filter-category">
+          <option value="">All Categories</option>
+          <option value="MOROCCAN_CONSULATE">Moroccan Consulate</option>
+          <option value="OTHER_SERVICES">Other Services</option>
+        </select>
+        <select id="filter-status">
+          <option value="">All Statuses</option>
+          <option value="WAITING_DOCUMENTS">Waiting Documents</option>
+          <option value="APPOINTMENT_BOOKED">Appointment Booked</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="PROBLEM_OR_MISSING_DOCUMENT">Problem / Missing Document</option>
+        </select>
+        <button id="export-csv">Export CSV</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>ID</th><th>Phone</th><th>Category</th><th>Service</th><th>Status</th><th>Appointment</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="clients-table-body"></tbody>
+      </table>
+    </section>
+
+    <section id="client-details" class="view hidden">
+      <h2>Client Details</h2>
+      <div id="client-details-content"></div>
+    </section>
+
+    <section id="calendar" class="view hidden">
+      <h2>Appointments Calendar View</h2>
+      <div id="calendar-list"></div>
+    </section>
+
+    <section id="document-manager" class="view hidden">
+      <h2>Import Scanned Documents</h2>
+      <button id="refresh-scans">Refresh Scan Folder</button>
+      <div id="scan-files"></div>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
