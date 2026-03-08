@@ -39,6 +39,7 @@ function initDatabase(dbPath) {
       serviceDescription TEXT,
       notes TEXT,
       status TEXT NOT NULL DEFAULT 'WAITING_DOCUMENTS',
+      callStatus TEXT NOT NULL DEFAULT 'NOT_CALLED',
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE
     );
@@ -52,9 +53,11 @@ function initDatabase(dbPath) {
     CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status);
     CREATE INDEX IF NOT EXISTS idx_applications_clientId ON applications(clientId);
     CREATE INDEX IF NOT EXISTS idx_applications_createdAt ON applications(createdAt);
+    CREATE INDEX IF NOT EXISTS idx_applications_callStatus ON applications(callStatus);
   `);
 
   ensureColumn('clients', 'applicationId', 'TEXT');
+  ensureColumn('applications', 'callStatus', "TEXT DEFAULT 'NOT_CALLED'");
 }
 
 function getDb() {

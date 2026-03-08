@@ -12,8 +12,23 @@
   <div id="scan-modal" class="modal hidden">
     <div class="modal-content">
       <h3>Scan Session Active</h3>
-      <p id="scan-modal-text">This client is now active for scanning. Scan now and all new scanned files will move directly to this client's folder.</p>
+      <p id="scan-modal-text">This client is active now. Scan documents and they will move directly to this folder.</p>
       <button id="finish-scan-session" class="danger-btn">Click here to finish scanning</button>
+    </div>
+  </div>
+
+  <div id="add-application-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Add Another Application</h3>
+      <label><span data-i18n="applicationId">Application ID</span><input id="new-app-id" /></label>
+      <label><span data-i18n="serviceDescription">Service Description</span><textarea id="new-app-service"></textarea></label>
+      <label><span data-i18n="notes">Notes</span><textarea id="new-app-notes"></textarea></label>
+      <label><span data-i18n="status">Status</span><select id="new-app-status"></select></label>
+      <label>Call State<select id="new-app-call-status"></select></label>
+      <div class="actions-row">
+        <button id="save-new-application">Save Application</button>
+        <button id="cancel-new-application" class="danger-btn">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -28,17 +43,14 @@
       </select>
     </div>
     <nav>
-      <button data-view="dashboard" data-i18n="dashboard">Dashboard</button>
-      <button data-view="add-client" data-i18n="addClient">Add Client</button>
       <button data-view="client-list" data-i18n="clientList">Client List</button>
+      <button data-view="add-client" data-i18n="addClient">Add Client</button>
       <button data-view="document-manager" data-i18n="documentManager">Document Manager</button>
       <button data-view="scanner-setup" data-i18n="scannerSetup">Scanner Setup</button>
     </nav>
   </header>
 
   <main>
-    <section id="dashboard" class="view"></section>
-
     <section id="add-client" class="view hidden">
       <h2 data-i18n="addClient">Add Client</h2>
       <form id="client-form">
@@ -53,7 +65,6 @@
             </select>
           </label>
           <label><span data-i18n="applicationId">Application ID</span><input name="applicationId" /></label>
-          <label><span data-i18n="status">Status</span><select name="status" id="status-select-add"></select></label>
         </div>
         <label><span data-i18n="serviceDescription">Service Description</span><textarea name="serviceDescription" required></textarea></label>
         <label><span data-i18n="notes">Notes</span><textarea name="notes"></textarea></label>
@@ -62,7 +73,7 @@
       <p id="add-client-message"></p>
     </section>
 
-    <section id="client-list" class="view hidden">
+    <section id="client-list" class="view">
       <h2 data-i18n="clientList">Client List</h2>
       <div class="filters">
         <input id="search-input" placeholder="Search by name, ID, phone, service, application ID" />

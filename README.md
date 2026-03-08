@@ -56,7 +56,7 @@ npm start
 /app
   /main        -> Electron main process, IPC handlers, window bootstrap
   /preload     -> secure bridge API between renderer and main
-  /renderer    -> HTML/CSS/JS user interface (dashboard, list, details, docs)
+  /renderer    -> HTML/CSS/JS user interface (list, details, docs)
   /database    -> SQLite initialization and schema
   /storage     -> filesystem helpers (folders, file import, document operations)
 ```
@@ -186,8 +186,7 @@ dist/
 - **Change case status**: open client details and update status dropdown.
 
 ### Screenshot placeholders
-- Dashboard screenshot: `docs/screenshots/dashboard.png`
-- Add client form: `docs/screenshots/add-client.png`
+- - Add client form: `docs/screenshots/add-client.png`
 - Client details and document list: `docs/screenshots/client-details.png`
 - Document manager import view: `docs/screenshots/document-manager.png`
 

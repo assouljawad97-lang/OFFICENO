@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   getDashboardStats: () => ipcRenderer.invoke('dashboard:stats'),
   listApplications: clientId => ipcRenderer.invoke('applications:list', clientId),
   addApplication: payload => ipcRenderer.invoke('applications:add', payload),
+  updateApplicationCallStatus: payload => ipcRenderer.invoke('applications:update-call-status', payload),
   uploadDocuments: payload => ipcRenderer.invoke('documents:upload', payload),
   listDocuments: payload => ipcRenderer.invoke('documents:list', payload),
   openDocument: filePath => ipcRenderer.invoke('documents:open', filePath),

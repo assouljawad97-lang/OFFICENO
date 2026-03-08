@@ -17,7 +17,7 @@ let scanWatcher = null;
 let lastSeenFiles = new Set();
 const scanLogs = [];
 
-const STATUS = ['WAITING_DOCUMENTS', 'APPOINTMENT_BOOKED', 'COMPLETED', 'PROBLEM_OR_MISSING_DOCUMENT'];
+const STATUS = ['WAITING_DOCUMENTS', 'WORKING_ON_APPLICATION', 'APPOINTMENT_BOOKED', 'COMPLETED', 'PROBLEM_OR_MISSING_DOCUMENT'];
 
 const defaultSettings = {
   language: 'en',
@@ -177,9 +177,9 @@ function registerIpcHandlers() {
     const clientId = info.lastInsertRowid;
 
     db.prepare(`
-      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(clientId, payload.applicationId || '', payload.serviceDescription || '', payload.notes || '', payload.status || 'WAITING_DOCUMENTS');
+      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status, callStatus)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(clientId, payload.applicationId || '', payload.serviceDescription || '', payload.notes || '', payload.status || 'WAITING_DOCUMENTS', 'NOT_CALLED');
 
     return db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
   });
@@ -254,14 +254,15 @@ function registerIpcHandlers() {
     if (!client) throw new Error('Client not found');
 
     db.prepare(`
-      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status)
-      VALUES (@clientId, @applicationId, @serviceDescription, @notes, @status)
+      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status, callStatus)
+      VALUES (@clientId, @applicationId, @serviceDescription, @notes, @status, @callStatus)
     `).run({
       clientId: payload.clientId,
       applicationId: payload.applicationId || '',
       serviceDescription: payload.serviceDescription || '',
       notes: payload.notes || '',
-      status: payload.status || 'WAITING_DOCUMENTS'
+      status: payload.status || 'WAITING_DOCUMENTS',
+      callStatus: payload.callStatus || 'NOT_CALLED'
     });
 
     db.prepare(`
@@ -276,9 +277,18 @@ function registerIpcHandlers() {
       applicationId: payload.applicationId || '',
       serviceDescription: payload.serviceDescription || '',
       notes: payload.notes || '',
-      status: payload.status || 'WAITING_DOCUMENTS'
+      status: payload.status || 'WAITING_DOCUMENTS',
+      callStatus: payload.callStatus || 'NOT_CALLED'
     });
 
+    return { success: true };
+  });
+
+
+  ipcMain.handle('applications:update-call-status', async (_event, { id, callStatus }) => {
+    const allowed = ['NOT_CALLED', 'ANSWERED', 'NO_ANSWER'];
+    if (!allowed.includes(callStatus)) throw new Error('Invalid call status');
+    getDb().prepare('UPDATE applications SET callStatus = ? WHERE id = ?').run(callStatus, id);
     return { success: true };
   });
 

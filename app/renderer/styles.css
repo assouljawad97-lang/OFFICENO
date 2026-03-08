@@ -56,3 +56,6 @@ th { background: #f4f7ff; }
 .modal { position: fixed; inset: 0; background: rgba(20, 26, 44, 0.55); z-index: 9998; display: flex; align-items: center; justify-content: center; }
 .modal.hidden { display: none; }
 .modal-content { background: #fff; border-radius: 12px; width: min(640px, 92vw); padding: 18px; box-shadow: var(--shadow); }
+
+.history-table { margin-top: 10px; }
+.history-table select { min-width: 150px; }
