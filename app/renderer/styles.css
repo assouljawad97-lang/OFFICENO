@@ -130,3 +130,28 @@ th { background: #f4f7ff; }
 .scan-finish-btn:hover {
   background: linear-gradient(120deg, #25734a, #2e8d5b);
 }
+
+
+.inline-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.scan-preview {
+  margin-top: 12px;
+  border: 1px solid #d8e3ff;
+  border-radius: 10px;
+  background: #f8fbff;
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: #566386;
+  padding: 10px;
+}
+.scan-preview img {
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(30,45,90,.2);
+}
+#scan-scanner-status {
+  background: #f0f4ff;
+  color: #33456f;
+  font-weight: 600;
+}

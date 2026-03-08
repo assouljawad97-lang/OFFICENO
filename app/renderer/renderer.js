@@ -41,6 +41,9 @@ let currentLang = 'en';
 let selectedClientId = null;
 let pendingAddApplicationClientId = null;
 let applicationCache = new Map();
+let scannerConfigs = [];
+let currentScanClientFolder = '';
+
 
 function t(key) { return translations[currentLang]?.[key] || translations.en[key] || key; }
 const statusMap = () => ({ WAITING_DOCUMENTS: t('waiting'), WORKING_ON_APPLICATION: t('working'), APPOINTMENT_BOOKED: t('booked'), COMPLETED: t('completed'), PROBLEM_OR_MISSING_DOCUMENT: t('problem') });
@@ -81,6 +84,8 @@ function refreshFilterLabels() {
   const editCall = document.getElementById('edit-app-call-status');
   if (editStatus) editStatus.innerHTML = Object.entries(statusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
   if (editCall) editCall.innerHTML = Object.entries(callStatusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+  const scanScanner = document.getElementById('scan-scanner-select');
+  if (scanScanner) scanScanner.innerHTML = scannerConfigs.map(s => `<option value="${s.id}">${s.name} (${s.type})</option>`).join('');
 }
 
 function badge(status) { return `<span class="badge status-${status}">${statusMap()[status] || status}</span>`; }
@@ -185,7 +190,7 @@ async function openDetails(id) {
 
     <div class="actions-row">
       <button class="big-save" onclick="saveClientDetails()">💾 ${t('bigSave')}</button>
-      <button onclick="startScanSession(${client.id})">📠 ${t('scan')}</button>
+      <button onclick="startScanSession(${client.id}, '${client.folderPath.replace(/\\/g, '\\\\')}')">📠 ${t('scan')}</button>
       <button onclick="openFolder('${client.folderPath.replace(/\\/g, '\\\\')}')">📁 ${t('openFolder')}</button>
       <button class="danger-btn" onclick="deleteClient(${client.id})">🗑️ ${t('deleteClient')}</button>
     </div>
@@ -252,18 +257,35 @@ async function saveNewApplication() {
   await loadClients();
 }
 
-async function startScanSession(clientId) {
-  await window.api.setActiveScannerClient(clientId);
-  await window.api.updateSettings({ autoImportEnabled: true });
+async function refreshScannerOnlineStatus() {
+  const scannerId = document.getElementById('scan-scanner-select').value;
+  if (!scannerId) return;
+  document.getElementById('scan-scanner-status').value = 'Checking...';
+  const status = await window.api.checkScannerOnline(scannerId);
+  document.getElementById('scan-scanner-status').value = status.online ? `Online (${status.reason})` : `Offline (${status.reason})`;
+}
+
+async function startScanSession(clientId, clientFolder) {
+  currentScanClientFolder = clientFolder;
+  document.getElementById('scan-destination-folder').value = clientFolder || '';
+  document.getElementById('scan-preview').innerHTML = '<p>No scan preview yet.</p>';
+
+  scannerConfigs = await window.api.listScanners();
+  const scannerSelect = document.getElementById('scan-scanner-select');
+  scannerSelect.innerHTML = scannerConfigs.map(s => `<option value="${s.id}">${s.name} (${s.type})</option>`).join('');
+
+  const settings = await window.api.getSettings();
+  if (settings.defaultScannerId && scannerConfigs.some(s => s.id === settings.defaultScannerId)) {
+    scannerSelect.value = settings.defaultScannerId;
+  }
+
+  await refreshScannerOnlineStatus();
   document.getElementById('scan-modal').classList.remove('hidden');
-  showToast(t('scanStarted'));
 }
 window.startScanSession = startScanSession;
 
 async function finishScanSession() {
-  await window.api.clearActiveScannerClient();
   document.getElementById('scan-modal').classList.add('hidden');
-  showToast(t('scanFinished'), 'warn');
 }
 
 async function uploadDocs() { await window.api.uploadDocuments({ clientId: selectedClientId }); await openDetails(selectedClientId); }
@@ -296,13 +318,27 @@ window.importScan = importScan;
 
 async function loadScannerSettings() {
   const settings = await window.api.getSettings();
-  const clients = await window.api.listClients({});
-  document.getElementById('scan-folder-input').value = settings.scanFolderPath || '';
+  scannerConfigs = settings.scanners || [];
+
   document.getElementById('default-doc-type').value = settings.defaultDocumentType || 'Scan';
-  document.getElementById('auto-import-toggle').checked = Boolean(settings.autoImportEnabled);
-  document.getElementById('active-client-select').innerHTML = `<option value="">None</option>${clients.map(c => `<option value="${c.id}" ${Number(settings.activeClientId) === c.id ? 'selected' : ''}>${c.fullName}</option>`).join('')}`;
+  document.getElementById('default-scanner-select').innerHTML = scannerConfigs.map(sc => `<option value="${sc.id}" ${settings.defaultScannerId===sc.id?'selected':''}>${sc.name} (${sc.type})</option>`).join('');
+
+  const tbody = document.getElementById('scanner-table-body');
+  tbody.innerHTML = scannerConfigs.map(sc => `
+    <tr>
+      <td>${sc.name}</td>
+      <td>${sc.type}</td>
+      <td>${sc.baseUrl || sc.host || '-'}</td>
+      <td><button class="danger-btn" onclick="removeScanner('${sc.id}')">Delete</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="4">No scanners configured.</td></tr>';
+
   document.getElementById('scan-logs').innerHTML = (settings.scanLogs || []).map(log => `<li>${log.at} - ${log.message}</li>`).join('') || '<li>No logs yet.</li>';
 }
+window.removeScanner = function removeScanner(id) {
+  scannerConfigs = scannerConfigs.filter(s => s.id !== id);
+  loadScannerSettings();
+};
 
 function wireEvents() {
   document.querySelectorAll('nav button').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
@@ -337,24 +373,71 @@ function wireEvents() {
   });
 
   document.getElementById('save-scanner-settings').addEventListener('click', async () => {
+    const name = document.getElementById('scanner-name').value.trim();
+    const type = document.getElementById('scanner-type').value;
+    const host = document.getElementById('scanner-host').value.trim();
+    const baseUrl = document.getElementById('scanner-base-url').value.trim();
+
+    if (name) {
+      scannerConfigs.push({
+        id: `sc-${Date.now()}`,
+        name,
+        type,
+        host,
+        baseUrl
+      });
+      document.getElementById('scanner-name').value = '';
+      document.getElementById('scanner-host').value = '';
+      document.getElementById('scanner-base-url').value = '';
+    }
+
     await window.api.updateSettings({
-      scanFolderPath: document.getElementById('scan-folder-input').value,
       defaultDocumentType: document.getElementById('default-doc-type').value,
-      activeClientId: Number(document.getElementById('active-client-select').value) || null,
-      autoImportEnabled: document.getElementById('auto-import-toggle').checked,
+      defaultScannerId: document.getElementById('default-scanner-select').value || (scannerConfigs[0] && scannerConfigs[0].id) || null,
+      scanners: scannerConfigs,
       language: currentLang
     });
     showToast(t('scannerSaved'));
     await loadScannerSettings();
   });
 
-  document.getElementById('run-scan-now').addEventListener('click', async () => {
-    await window.api.runScannerNow();
-    await loadScannerSettings();
-    await loadScans();
-  });
-
   document.getElementById('finish-scan-session').addEventListener('click', finishScanSession);
+  document.getElementById('scan-close-btn').addEventListener('click', finishScanSession);
+  document.getElementById('scan-scanner-select').addEventListener('change', refreshScannerOnlineStatus);
+  document.getElementById('scan-browse-destination').addEventListener('click', async () => {
+    const chosen = await window.api.pickScanDestination(document.getElementById('scan-destination-folder').value || currentScanClientFolder);
+    if (chosen) document.getElementById('scan-destination-folder').value = chosen;
+  });
+  document.getElementById('scan-open-destination').addEventListener('click', async () => {
+    const p = document.getElementById('scan-destination-folder').value;
+    if (p) await window.api.openClientFolder(p);
+  });
+  document.getElementById('scan-start-btn').addEventListener('click', async () => {
+    const scannerId = document.getElementById('scan-scanner-select').value;
+    const destinationFolder = document.getElementById('scan-destination-folder').value;
+    if (!scannerId || !destinationFolder) return showToast('Select scanner and destination folder', 'error');
+
+    const progress = document.getElementById('scan-progress');
+    progress.classList.remove('hidden');
+    try {
+      const result = await window.api.directScan({
+        scannerId,
+        destinationFolder,
+        filePrefix: `Client_${selectedClientId || 'Scan'}`
+      });
+      if (result.filePath.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i)) {
+        document.getElementById('scan-preview').innerHTML = `<img src="file://${result.filePath.replace(/\\/g, '/')}" alt="scan preview" />`;
+      } else {
+        document.getElementById('scan-preview').innerHTML = `<p>Scanned file saved: ${result.filePath}</p>`;
+      }
+      showToast('Scan completed and saved.');
+      if (selectedClientId) await openDetails(selectedClientId);
+    } catch (error) {
+      showToast(error.message || 'Direct scan failed', 'error');
+    } finally {
+      progress.classList.add('hidden');
+    }
+  });
   document.getElementById('save-new-application').addEventListener('click', saveNewApplication);
   document.getElementById('cancel-new-application').addEventListener('click', () => {
     document.getElementById('add-application-modal').classList.add('hidden');

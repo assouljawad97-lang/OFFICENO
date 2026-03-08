@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const { initDatabase, getDb } = require('../database/db');
 const {
   createClientFolder,
@@ -24,7 +26,11 @@ const defaultSettings = {
   scanFolderPath: '',
   autoImportEnabled: false,
   activeClientId: null,
-  defaultDocumentType: 'Scan'
+  defaultDocumentType: 'Scan',
+  scanners: [
+    { id: 'local-default', name: 'Local TWAIN/WIA Scanner', type: 'local_wia_twain', host: '', baseUrl: '' }
+  ],
+  defaultScannerId: 'local-default'
 };
 
 let settings = { ...defaultSettings };
@@ -125,6 +131,89 @@ function csvEscape(value) {
   const s = String(value ?? '');
   if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
   return s;
+}
+
+
+function httpRequestBuffer(urlString, { method = 'GET', headers = {}, body, timeout = 10000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlString);
+    const client = url.protocol === 'https:' ? https : http;
+    const req = client.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: `${url.pathname}${url.search}`,
+      method,
+      headers,
+      timeout
+    }, res => {
+      const chunks = [];
+      res.on('data', d => chunks.push(d));
+      res.on('end', () => resolve({
+        statusCode: res.statusCode || 0,
+        headers: res.headers,
+        body: Buffer.concat(chunks)
+      }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('Request timeout')));
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+async function checkScannerOnline(scanner) {
+  if (!scanner) return { online: false, reason: 'Scanner not found' };
+  if (scanner.type === 'local_wia_twain') {
+    return { online: true, reason: 'Local scanner assumed available (TWAIN/WIA runtime)' };
+  }
+
+  const baseUrl = scanner.baseUrl || (scanner.host ? `http://${scanner.host}` : '');
+  if (!baseUrl) return { online: false, reason: 'Missing scanner base URL/host' };
+
+  try {
+    const res = await httpRequestBuffer(`${baseUrl.replace(/\/$/, '')}/eSCL/ScannerStatus`, { timeout: 4000 });
+    return { online: res.statusCode >= 200 && res.statusCode < 500, reason: `HTTP ${res.statusCode}` };
+  } catch (error) {
+    return { online: false, reason: error.message };
+  }
+}
+
+async function triggerEsclScan(scanner) {
+  const baseUrl = scanner.baseUrl || (scanner.host ? `http://${scanner.host}` : '');
+  if (!baseUrl) throw new Error('Scanner URL/host not configured');
+
+  const scanSettingsXml = `<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScanSettings xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03">
+  <scan:Version>2.0</scan:Version>
+  <scan:Intent>Document</scan:Intent>
+  <scan:ColorMode>RGB24</scan:ColorMode>
+  <scan:XResolution>200</scan:XResolution>
+  <scan:YResolution>200</scan:YResolution>
+  <scan:DocumentFormat>image/jpeg</scan:DocumentFormat>
+</scan:ScanSettings>`;
+
+  const post = await httpRequestBuffer(`${baseUrl.replace(/\/$/, '')}/eSCL/ScanJobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/xml' },
+    body: scanSettingsXml
+  });
+
+  if (![200, 201].includes(post.statusCode)) {
+    throw new Error(`eSCL scan job creation failed: HTTP ${post.statusCode}`);
+  }
+
+  const location = post.headers.location;
+  if (!location) throw new Error('Scanner did not return job Location');
+
+  const nextDocUrl = location.endsWith('/NextDocument') ? location : `${location.replace(/\/$/, '')}/NextDocument`;
+  const doc = await httpRequestBuffer(nextDocUrl, { timeout: 30000 });
+  if (doc.statusCode !== 200 || !doc.body.length) {
+    throw new Error(`eSCL document fetch failed: HTTP ${doc.statusCode}`);
+  }
+
+  const contentType = String(doc.headers['content-type'] || 'image/jpeg').toLowerCase();
+  const ext = contentType.includes('pdf') ? '.pdf' : contentType.includes('png') ? '.png' : '.jpg';
+  return { buffer: doc.body, ext, contentType };
 }
 
 function registerIpcHandlers() {
@@ -359,6 +448,57 @@ function registerIpcHandlers() {
   ipcMain.handle('clients:open-folder', async (_event, folderPath) => {
     ensureFolder(folderPath);
     return shell.openPath(folderPath);
+  });
+
+
+  ipcMain.handle('scanners:list', async () => settings.scanners || []);
+
+  ipcMain.handle('scanners:check-online', async (_event, scannerId) => {
+    const scanner = (settings.scanners || []).find(s => s.id === scannerId);
+    return checkScannerOnline(scanner);
+  });
+
+  ipcMain.handle('scanner:pick-destination', async (_event, startPath) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: startPath || app.getPath('documents')
+    });
+    if (canceled || !filePaths.length) return null;
+    return filePaths[0];
+  });
+
+  ipcMain.handle('scanner:direct-scan', async (_event, payload) => {
+    const scanner = (settings.scanners || []).find(s => s.id === payload.scannerId);
+    if (!scanner) throw new Error('Selected scanner not found in configuration');
+
+    const destinationFolder = payload.destinationFolder;
+    if (!destinationFolder) throw new Error('Destination folder is required');
+    ensureFolder(destinationFolder);
+
+    const prefix = payload.filePrefix || 'Scan';
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (scanner.type === 'escl') {
+      const result = await triggerEsclScan(scanner);
+      const filePath = path.join(destinationFolder, `${prefix}_${stamp}${result.ext}`);
+      fs.writeFileSync(filePath, result.buffer);
+      addScanLog(`Direct eSCL scan saved to ${filePath}`);
+      return { filePath, contentType: result.contentType, scannerType: 'escl' };
+    }
+
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      title: 'Select scanned file from local TWAIN/WIA output',
+      filters: [{ name: 'Scanned Files', extensions: ['jpg', 'jpeg', 'png', 'pdf', 'tif', 'tiff'] }]
+    });
+    if (canceled || !filePaths.length) throw new Error('No scanned file selected');
+
+    const source = filePaths[0];
+    const ext = path.extname(source) || '.jpg';
+    const target = path.join(destinationFolder, `${prefix}_${stamp}${ext}`);
+    fs.copyFileSync(source, target);
+    addScanLog(`Local scanner file copied to ${target}`);
+    return { filePath: target, contentType: '', scannerType: scanner.type };
   });
 
   ipcMain.handle('scans:list', async () => listScannedFiles(settings.scanFolderPath));

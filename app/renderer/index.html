@@ -13,15 +13,38 @@
     <div class="modal-content scan-modal-content">
       <div class="scan-header">
         <div class="scan-icon" aria-hidden="true">🖨️</div>
-        <h3>Scan Session Active</h3>
+        <h3>Direct Scan</h3>
       </div>
-      <p id="scan-modal-text">This client is active now. Scan documents and they will move directly to this folder.</p>
-      <div class="scan-animation" aria-hidden="true">
+      <p id="scan-modal-text">Choose a configured scanner and scan directly from the app.</p>
+
+      <div class="grid">
+        <label>Scanner<select id="scan-scanner-select"></select></label>
+        <label>Scanner Status<input id="scan-scanner-status" disabled value="Unknown" /></label>
+      </div>
+
+      <div class="grid">
+        <label>Destination Folder<input id="scan-destination-folder" /></label>
+        <label>Actions
+          <div class="inline-actions">
+            <button id="scan-browse-destination">Browse</button>
+            <button id="scan-open-destination">Open Path</button>
+          </div>
+        </label>
+      </div>
+
+      <div class="scan-animation hidden" id="scan-progress" aria-hidden="true">
         <div class="scan-line"></div>
         <div class="scan-page"></div>
       </div>
-      <p class="scan-tip">You can keep scanning multiple pages. When done, click finish.</p>
-      <button id="finish-scan-session" class="scan-finish-btn">✅ Finish Scanning</button>
+
+      <div class="inline-actions">
+        <button id="scan-start-btn" class="scan-finish-btn">📠 Scan Now</button>
+        <button id="scan-close-btn">Close</button>
+      </div>
+
+      <div class="scan-preview" id="scan-preview">
+        <p>No scan preview yet.</p>
+      </div>
     </div>
   </div>
 
@@ -137,14 +160,35 @@
 
     <section id="scanner-setup" class="view hidden">
       <h2 data-i18n="scannerSetup">Scanner Setup</h2>
+      <p>Configure scanners here. The scan popup will only show scanners configured below.</p>
+
       <div class="grid">
-        <label><span data-i18n="scanFolder">Scan Folder Path</span><input id="scan-folder-input" /></label>
-        <label><span data-i18n="defaultDocType">Default Document Type</span><input id="default-doc-type" /></label>
-        <label><span data-i18n="activeClient">Active Client for Auto-Scan</span><select id="active-client-select"></select></label>
-        <label><span data-i18n="autoImport">Auto import scans</span><input id="auto-import-toggle" type="checkbox" /></label>
+        <label>Default Document Type<input id="default-doc-type" /></label>
+        <label>Default Scanner<select id="default-scanner-select"></select></label>
       </div>
-      <button id="save-scanner-settings" data-i18n="saveSettings">Save Scanner Settings</button>
-      <button id="run-scan-now" data-i18n="scanNow">Scan Now</button>
+
+      <h3>Configured Scanners</h3>
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Host/Base URL</th><th>Actions</th></tr></thead>
+        <tbody id="scanner-table-body"></tbody>
+      </table>
+
+      <h3>Add / Edit Scanner</h3>
+      <div class="grid">
+        <label>Scanner Name<input id="scanner-name" /></label>
+        <label>Type
+          <select id="scanner-type">
+            <option value="local_wia_twain">Local TWAIN/WIA</option>
+            <option value="escl">Network eSCL</option>
+          </select>
+        </label>
+        <label>Host (IP or hostname)<input id="scanner-host" placeholder="192.168.1.90" /></label>
+        <label>Base URL (optional)<input id="scanner-base-url" placeholder="http://192.168.1.90" /></label>
+      </div>
+      <div class="inline-actions">
+        <button id="save-scanner-settings" data-i18n="saveSettings">Save Scanner Configuration</button>
+      </div>
+
       <h3 data-i18n="scanLogs">Scan Logs</h3>
       <ul id="scan-logs"></ul>
     </section>

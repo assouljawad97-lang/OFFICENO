@@ -139,15 +139,22 @@ C:/Scans
 - UI language can be switched between **English**, **Spanish**, and **Arabic** from the header language selector.
 - Arabic mode enables right-to-left layout for easier reading.
 
-## ADVANCED SCANNER WORKFLOW (AUTO-ROUTING)
-A new **Scanner Setup** page is available in the navbar. It allows you to:
-- Set the scan folder path
-- Enable/disable auto-import
-- Choose an active client for auto-scan routing
-- Set a default document type prefix
-- Review scan logs
+## ADVANCED SCANNER WORKFLOW (DIRECT SCAN FIRST)
+The app now supports **direct scan trigger** from the client details popup.
 
-When auto-import is enabled and an active client is selected, newly detected scan files are automatically moved to that client's folder.
+Scanner Setup page is used to preconfigure scanners:
+- Local scanner profile (`local_wia_twain`)
+- Network scanner profile (`escl` over LAN)
+- Default scanner selection
+- Default document type prefix
+
+In Client Details -> Scan popup you can:
+- choose one of the preconfigured scanners
+- check online/offline state
+- pick destination folder (default: current client folder)
+- trigger direct scan and preview the resulting file
+
+Folder monitor import is still available as compatibility fallback.
 
 ## BUILDING THE WINDOWS APPLICATION
 This project uses **electron-builder**.
