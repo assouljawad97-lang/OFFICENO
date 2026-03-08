@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Officeno Admin Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <div id="scan-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Scan Session Active</h3>
+      <p id="scan-modal-text">This client is now active for scanning. Scan now and all new scanned files will move directly to this client's folder.</p>
+      <button id="finish-scan-session" class="danger-btn">Click here to finish scanning</button>
+    </div>
+  </div>
+
+  <header>
+    <h1 data-i18n="appTitle">Officeno Admin Manager</h1>
+    <div class="header-actions">
+      <label data-i18n="language">Language</label>
+      <select id="language-select">
+        <option value="en">English</option>
+        <option value="es">Español</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+    <nav>
+      <button data-view="dashboard" data-i18n="dashboard">Dashboard</button>
+      <button data-view="add-client" data-i18n="addClient">Add Client</button>
+      <button data-view="client-list" data-i18n="clientList">Client List</button>
+      <button data-view="document-manager" data-i18n="documentManager">Document Manager</button>
+      <button data-view="scanner-setup" data-i18n="scannerSetup">Scanner Setup</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard" class="view"></section>
+
+    <section id="add-client" class="view hidden">
+      <h2 data-i18n="addClient">Add Client</h2>
+      <form id="client-form">
+        <div class="grid">
+          <label><span data-i18n="fullName">Full Name</span><input required name="fullName" /></label>
+          <label><span data-i18n="idPassport">National ID or Passport Number</span><input required name="nationalId" /></label>
+          <label><span data-i18n="phone">Phone Number</span><input name="phone" /></label>
+          <label><span data-i18n="category">Service Category</span>
+            <select required name="category">
+              <option value="MOROCCAN_CONSULATE" data-i18n="moroccanConsulate">Moroccan Consulate</option>
+              <option value="OTHER_SERVICES" data-i18n="otherServices">Other Administrative Services</option>
+            </select>
+          </label>
+          <label><span data-i18n="applicationId">Application ID</span><input name="applicationId" /></label>
+          <label><span data-i18n="status">Status</span><select name="status" id="status-select-add"></select></label>
+        </div>
+        <label><span data-i18n="serviceDescription">Service Description</span><textarea name="serviceDescription" required></textarea></label>
+        <label><span data-i18n="notes">Notes</span><textarea name="notes"></textarea></label>
+        <button type="submit" class="big-save" data-i18n="createClient">Save Client</button>
+      </form>
+      <p id="add-client-message"></p>
+    </section>
+
+    <section id="client-list" class="view hidden">
+      <h2 data-i18n="clientList">Client List</h2>
+      <div class="filters">
+        <input id="search-input" placeholder="Search by name, ID, phone, service, application ID" />
+        <select id="filter-category"></select>
+        <select id="filter-status"></select>
+        <button id="export-csv" data-i18n="exportCsv">Export CSV</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="fullName">Name</th>
+            <th>ID</th>
+            <th data-i18n="phone">Phone</th>
+            <th data-i18n="applicationId">Application ID</th>
+            <th data-i18n="category">Category</th>
+            <th data-i18n="status">Status</th>
+            <th data-i18n="createdAt">Created</th>
+            <th data-i18n="actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="clients-table-body"></tbody>
+      </table>
+    </section>
+
+    <section id="client-details" class="view hidden">
+      <h2 data-i18n="clientDetails">Client Details</h2>
+      <div id="client-details-content"></div>
+    </section>
+
+    <section id="document-manager" class="view hidden">
+      <h2 data-i18n="importScans">Import Scanned Documents</h2>
+      <button id="refresh-scans" data-i18n="refreshScanFolder">Refresh Scan Folder</button>
+      <div id="scan-files"></div>
+    </section>
+
+    <section id="scanner-setup" class="view hidden">
+      <h2 data-i18n="scannerSetup">Scanner Setup</h2>
+      <div class="grid">
+        <label><span data-i18n="scanFolder">Scan Folder Path</span><input id="scan-folder-input" /></label>
+        <label><span data-i18n="defaultDocType">Default Document Type</span><input id="default-doc-type" /></label>
+        <label><span data-i18n="activeClient">Active Client for Auto-Scan</span><select id="active-client-select"></select></label>
+        <label><span data-i18n="autoImport">Auto import scans</span><input id="auto-import-toggle" type="checkbox" /></label>
+      </div>
+      <button id="save-scanner-settings" data-i18n="saveSettings">Save Scanner Settings</button>
+      <button id="run-scan-now" data-i18n="scanNow">Scan Now</button>
+      <h3 data-i18n="scanLogs">Scan Logs</h3>
+      <ul id="scan-logs"></ul>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
