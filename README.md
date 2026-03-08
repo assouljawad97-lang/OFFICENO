@@ -83,6 +83,7 @@ npm start
 
 Status values:
 - `WAITING_DOCUMENTS` (default)
+- `WORKING_ON_APPLICATION`
 - `APPOINTMENT_BOOKED`
 - `COMPLETED`
 - `PROBLEM_OR_MISSING_DOCUMENT`
@@ -224,6 +225,7 @@ dist/
 
 ## APPLICATION HISTORY
 Each client can have multiple applications over time.
-- In client details, use **Add Another Application** to append new service requests.
+- In client details, use **Add Application** to open a popup and append new service requests.
 - History keeps records of application ID, description, notes, status, and date.
+- Call state tracking is included per application (`NOT_CALLED`, `ANSWERED`, `NO_ANSWER`) and is editable only through the Edit action.
 - Latest application is reflected on the main client record for quick filtering/search.

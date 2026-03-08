@@ -285,6 +285,53 @@ function registerIpcHandlers() {
   });
 
 
+
+  ipcMain.handle('applications:update', async (_event, payload) => {
+    const db = getDb();
+    const existing = db.prepare('SELECT * FROM applications WHERE id = ?').get(payload.id);
+    if (!existing) throw new Error('Application not found');
+
+    const allowedCall = ['NOT_CALLED', 'ANSWERED', 'NO_ANSWER'];
+    if (!allowedCall.includes(payload.callStatus)) throw new Error('Invalid call status');
+
+    db.prepare(`
+      UPDATE applications
+      SET applicationId=@applicationId,
+          serviceDescription=@serviceDescription,
+          notes=@notes,
+          status=@status,
+          callStatus=@callStatus
+      WHERE id=@id
+    `).run({
+      id: payload.id,
+      applicationId: payload.applicationId || '',
+      serviceDescription: payload.serviceDescription || '',
+      notes: payload.notes || '',
+      status: payload.status || 'WAITING_DOCUMENTS',
+      callStatus: payload.callStatus || 'NOT_CALLED'
+    });
+
+    const latest = db.prepare('SELECT * FROM applications WHERE clientId = ? ORDER BY datetime(createdAt) DESC LIMIT 1').get(existing.clientId);
+    if (latest) {
+      db.prepare(`
+        UPDATE clients
+        SET applicationId = @applicationId,
+            serviceDescription = @serviceDescription,
+            notes = @notes,
+            status = @status
+        WHERE id = @clientId
+      `).run({
+        clientId: existing.clientId,
+        applicationId: latest.applicationId || '',
+        serviceDescription: latest.serviceDescription || '',
+        notes: latest.notes || '',
+        status: latest.status || 'WAITING_DOCUMENTS'
+      });
+    }
+
+    return { success: true };
+  });
+
   ipcMain.handle('applications:update-call-status', async (_event, { id, callStatus }) => {
     const allowed = ['NOT_CALLED', 'ANSWERED', 'NO_ANSWER'];
     if (!allowed.includes(callStatus)) throw new Error('Invalid call status');

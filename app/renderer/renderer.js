@@ -40,6 +40,7 @@ const translations = {
 let currentLang = 'en';
 let selectedClientId = null;
 let pendingAddApplicationClientId = null;
+let applicationCache = new Map();
 
 function t(key) { return translations[currentLang]?.[key] || translations.en[key] || key; }
 const statusMap = () => ({ WAITING_DOCUMENTS: t('waiting'), WORKING_ON_APPLICATION: t('working'), APPOINTMENT_BOOKED: t('booked'), COMPLETED: t('completed'), PROBLEM_OR_MISSING_DOCUMENT: t('problem') });
@@ -76,9 +77,19 @@ function refreshFilterLabels() {
   document.getElementById('filter-status').innerHTML = `<option value="">All</option>${Object.entries(statusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('')}`;
   document.getElementById('new-app-status').innerHTML = Object.entries(statusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
   document.getElementById('new-app-call-status').innerHTML = Object.entries(callStatusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+  const editStatus = document.getElementById('edit-app-status');
+  const editCall = document.getElementById('edit-app-call-status');
+  if (editStatus) editStatus.innerHTML = Object.entries(statusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+  if (editCall) editCall.innerHTML = Object.entries(callStatusMap()).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
 }
 
 function badge(status) { return `<span class="badge status-${status}">${statusMap()[status] || status}</span>`; }
+
+function callBadge(callStatus) {
+  const label = callStatusMap()[callStatus] || callStatus;
+  const cls = callStatus === 'ANSWERED' ? 'call-status-answered' : callStatus === 'NO_ANSWER' ? 'call-status-no-answer' : 'call-status-not-called';
+  return `<span class="call-badge ${cls}">${label}</span>`;
+}
 
 async function loadClients() {
   const clients = await window.api.listClients({
@@ -124,17 +135,41 @@ function openAddApplicationModal(clientId) {
 }
 window.openAddApplicationModal = openAddApplicationModal;
 
-async function updateApplicationCallStatus(applicationId, callStatus) {
-  await window.api.updateApplicationCallStatus({ id: Number(applicationId), callStatus });
-  showToast('Call state updated.');
+function openEditApplicationModal(applicationId) {
+  const app = applicationCache.get(Number(applicationId));
+  if (!app) return;
+  document.getElementById('edit-app-id').value = app.id;
+  document.getElementById('edit-app-application-id').value = app.applicationId || '';
+  document.getElementById('edit-app-service').value = app.serviceDescription || '';
+  document.getElementById('edit-app-notes').value = app.notes || '';
+  document.getElementById('edit-app-status').value = app.status || 'WAITING_DOCUMENTS';
+  document.getElementById('edit-app-call-status').value = app.callStatus || 'NOT_CALLED';
+  document.getElementById('edit-application-modal').classList.remove('hidden');
 }
-window.updateApplicationCallStatus = updateApplicationCallStatus;
+window.openEditApplicationModal = openEditApplicationModal;
+
+async function saveEditedApplication() {
+  const payload = {
+    id: Number(document.getElementById('edit-app-id').value),
+    applicationId: document.getElementById('edit-app-application-id').value,
+    serviceDescription: document.getElementById('edit-app-service').value,
+    notes: document.getElementById('edit-app-notes').value,
+    status: document.getElementById('edit-app-status').value,
+    callStatus: document.getElementById('edit-app-call-status').value
+  };
+  await window.api.updateApplication(payload);
+  document.getElementById('edit-application-modal').classList.add('hidden');
+  showToast('Application updated.');
+  await openDetails(selectedClientId);
+  await loadClients();
+}
 
 async function openDetails(id) {
   selectedClientId = id;
   const client = await window.api.getClient(id);
   const docs = await window.api.listDocuments({ clientId: id });
   const applications = await window.api.listApplications(id);
+  applicationCache = new Map(applications.map(a => [Number(a.id), a]));
 
   document.getElementById('client-details-content').innerHTML = `
     <div class="grid">
@@ -159,7 +194,7 @@ async function openDetails(id) {
     <button onclick="openAddApplicationModal(${client.id})">➕ Add Application</button>
     <table class="history-table">
       <thead>
-        <tr><th>${t('applicationId')}</th><th>${t('serviceDescription')}</th><th>${t('status')}</th><th>${t('callState')}</th><th>${t('createdAt')}</th></tr>
+        <tr><th>${t('applicationId')}</th><th>${t('serviceDescription')}</th><th>${t('status')}</th><th>${t('callState')}</th><th>${t('createdAt')}</th><th>${t('actions')}</th></tr>
       </thead>
       <tbody>
         ${applications.map(a => `
@@ -167,14 +202,11 @@ async function openDetails(id) {
             <td>${a.applicationId || '-'}</td>
             <td>${a.serviceDescription || '-'}</td>
             <td>${badge(a.status)}</td>
-            <td>
-              <select onchange="updateApplicationCallStatus(${a.id}, this.value)">
-                ${Object.entries(callStatusMap()).map(([k,v]) => `<option value="${k}" ${a.callStatus===k?'selected':''}>${v}</option>`).join('')}
-              </select>
-            </td>
+            <td>${callBadge(a.callStatus || 'NOT_CALLED')}</td>
             <td>${formatDate(a.createdAt)}</td>
+            <td><button onclick="openEditApplicationModal(${a.id})">✏️ Edit</button></td>
           </tr>
-        `).join('') || '<tr><td colspan="5">No applications yet.</td></tr>'}
+        `).join('') || '<tr><td colspan="6">No applications yet.</td></tr>'}
       </tbody>
     </table>
 
@@ -326,6 +358,11 @@ function wireEvents() {
   document.getElementById('save-new-application').addEventListener('click', saveNewApplication);
   document.getElementById('cancel-new-application').addEventListener('click', () => {
     document.getElementById('add-application-modal').classList.add('hidden');
+  });
+
+  document.getElementById('save-edit-application').addEventListener('click', saveEditedApplication);
+  document.getElementById('cancel-edit-application').addEventListener('click', () => {
+    document.getElementById('edit-application-modal').classList.add('hidden');
   });
 }
 

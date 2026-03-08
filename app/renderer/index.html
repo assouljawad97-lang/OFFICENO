@@ -10,10 +10,18 @@
   <div id="toast-container"></div>
 
   <div id="scan-modal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Scan Session Active</h3>
+    <div class="modal-content scan-modal-content">
+      <div class="scan-header">
+        <div class="scan-icon" aria-hidden="true">🖨️</div>
+        <h3>Scan Session Active</h3>
+      </div>
       <p id="scan-modal-text">This client is active now. Scan documents and they will move directly to this folder.</p>
-      <button id="finish-scan-session" class="danger-btn">Click here to finish scanning</button>
+      <div class="scan-animation" aria-hidden="true">
+        <div class="scan-line"></div>
+        <div class="scan-page"></div>
+      </div>
+      <p class="scan-tip">You can keep scanning multiple pages. When done, click finish.</p>
+      <button id="finish-scan-session" class="scan-finish-btn">✅ Finish Scanning</button>
     </div>
   </div>
 
@@ -28,6 +36,24 @@
       <div class="actions-row">
         <button id="save-new-application">Save Application</button>
         <button id="cancel-new-application" class="danger-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  
+
+  <div id="edit-application-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Edit Application</h3>
+      <input type="hidden" id="edit-app-id" />
+      <label><span data-i18n="applicationId">Application ID</span><input id="edit-app-application-id" /></label>
+      <label><span data-i18n="serviceDescription">Service Description</span><textarea id="edit-app-service"></textarea></label>
+      <label><span data-i18n="notes">Notes</span><textarea id="edit-app-notes"></textarea></label>
+      <label><span data-i18n="status">Status</span><select id="edit-app-status"></select></label>
+      <label>Call State<select id="edit-app-call-status"></select></label>
+      <div class="actions-row">
+        <button id="save-edit-application">Save Changes</button>
+        <button id="cancel-edit-application" class="danger-btn">Cancel</button>
       </div>
     </div>
   </div>
