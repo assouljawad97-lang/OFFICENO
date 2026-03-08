@@ -133,6 +133,21 @@ C:/Scans
 
 ---
 
+
+## MULTI-LANGUAGE SUPPORT
+- UI language can be switched between **English**, **Spanish**, and **Arabic** from the header language selector.
+- Arabic mode enables right-to-left layout for easier reading.
+
+## ADVANCED SCANNER WORKFLOW (AUTO-ROUTING)
+A new **Scanner Setup** page is available in the navbar. It allows you to:
+- Set the scan folder path
+- Enable/disable auto-import
+- Choose an active client for auto-scan routing
+- Set a default document type prefix
+- Review scan logs
+
+When auto-import is enabled and an active client is selected, newly detected scan files are automatically moved to that client's folder.
+
 ## BUILDING THE WINDOWS APPLICATION
 This project uses **electron-builder**.
 

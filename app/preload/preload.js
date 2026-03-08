@@ -2,6 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('app:get-config'),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  updateSettings: payload => ipcRenderer.invoke('settings:update', payload),
+  setActiveScannerClient: clientId => ipcRenderer.invoke('scanner:set-active-client', clientId),
+  runScannerNow: () => ipcRenderer.invoke('scanner:scan-now'),
   createClient: payload => ipcRenderer.invoke('clients:create', payload),
   listClients: filters => ipcRenderer.invoke('clients:list', filters),
   getClient: id => ipcRenderer.invoke('clients:get', id),
