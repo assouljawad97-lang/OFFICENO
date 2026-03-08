@@ -17,12 +17,7 @@ let scanWatcher = null;
 let lastSeenFiles = new Set();
 const scanLogs = [];
 
-const STATUS = [
-  'WAITING_DOCUMENTS',
-  'APPOINTMENT_BOOKED',
-  'COMPLETED',
-  'PROBLEM_OR_MISSING_DOCUMENT'
-];
+const STATUS = ['WAITING_DOCUMENTS', 'APPOINTMENT_BOOKED', 'COMPLETED', 'PROBLEM_OR_MISSING_DOCUMENT'];
 
 const defaultSettings = {
   language: 'en',
@@ -58,15 +53,13 @@ function addScanLog(message) {
 function loadSettings() {
   const { settingsPath, defaultScanFolder } = getAppPaths();
   if (fs.existsSync(settingsPath)) {
-    const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings = { ...defaultSettings, ...parsed };
+    settings = { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsPath, 'utf8')) };
   }
   if (!settings.scanFolderPath) settings.scanFolderPath = defaultScanFolder;
 }
 
 function saveSettings() {
-  const { settingsPath } = getAppPaths();
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+  fs.writeFileSync(getAppPaths().settingsPath, JSON.stringify(settings, null, 2), 'utf8');
 }
 
 function getClientById(clientId) {
@@ -78,7 +71,7 @@ function autoImportNewScans() {
 
   const client = getClientById(settings.activeClientId);
   if (!client) {
-    addScanLog('Active client is not found. Auto-import skipped.');
+    addScanLog('Active client not found.');
     return;
   }
 
@@ -91,9 +84,9 @@ function autoImportNewScans() {
         clientFolder: client.folderPath,
         documentType: settings.defaultDocumentType || 'Scan'
       });
-      addScanLog(`Imported ${file.name} to ${client.fullName}.`);
+      addScanLog(`Imported ${file.name} to ${client.fullName}`);
     } catch (error) {
-      addScanLog(`Failed importing ${file.name}: ${error.message}`);
+      addScanLog(`Import failed for ${file.name}: ${error.message}`);
     }
   });
 
@@ -112,7 +105,7 @@ function restartScanWatcher() {
   scanWatcher = fs.watch(settings.scanFolderPath, { persistent: false }, () => {
     setTimeout(autoImportNewScans, 500);
   });
-  addScanLog(`Watching scan folder: ${settings.scanFolderPath}`);
+  addScanLog(`Watching ${settings.scanFolderPath}`);
 }
 
 function createWindow() {
@@ -125,15 +118,12 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 }
 
 function csvEscape(value) {
   const s = String(value ?? '');
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
@@ -149,7 +139,6 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('settings:get', async () => ({ ...settings, scanLogs, watching: Boolean(scanWatcher) }));
-
   ipcMain.handle('settings:update', async (_event, payload) => {
     settings = { ...settings, ...payload };
     saveSettings();
@@ -159,6 +148,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('scanner:set-active-client', async (_event, clientId) => {
     settings.activeClientId = clientId;
+    saveSettings();
+    return settings;
+  });
+
+  ipcMain.handle('scanner:clear-active-client', async () => {
+    settings.activeClientId = null;
     saveSettings();
     return settings;
   });
@@ -173,12 +168,20 @@ function registerIpcHandlers() {
     const paths = getAppPaths();
     const folderPath = createClientFolder(paths.clientsRoot, payload.category, payload.fullName, payload.nationalId);
 
-    const info = db.prepare(`
-      INSERT INTO clients (fullName, nationalId, phone, category, serviceDescription, appointmentDate, notes, status, folderPath)
-      VALUES (@fullName, @nationalId, @phone, @category, @serviceDescription, @appointmentDate, @notes, @status, @folderPath)
-    `).run({ ...payload, status: payload.status || 'WAITING_DOCUMENTS', folderPath });
+    const insert = db.prepare(`
+      INSERT INTO clients (fullName, nationalId, phone, category, serviceDescription, notes, applicationId, status, folderPath)
+      VALUES (@fullName, @nationalId, @phone, @category, @serviceDescription, @notes, @applicationId, @status, @folderPath)
+    `);
 
-    return db.prepare('SELECT * FROM clients WHERE id = ?').get(info.lastInsertRowid);
+    const info = insert.run({ ...payload, status: payload.status || 'WAITING_DOCUMENTS', folderPath });
+    const clientId = info.lastInsertRowid;
+
+    db.prepare(`
+      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(clientId, payload.applicationId || '', payload.serviceDescription || '', payload.notes || '', payload.status || 'WAITING_DOCUMENTS');
+
+    return db.prepare('SELECT * FROM clients WHERE id = ?').get(clientId);
   });
 
   ipcMain.handle('clients:list', async (_event, filters = {}) => {
@@ -187,9 +190,9 @@ function registerIpcHandlers() {
     const params = [];
 
     if (filters.search) {
-      query += ' AND (fullName LIKE ? OR nationalId LIKE ? OR phone LIKE ? OR serviceDescription LIKE ?)';
-      const searchParam = `%${filters.search}%`;
-      params.push(searchParam, searchParam, searchParam, searchParam);
+      query += ' AND (fullName LIKE ? OR nationalId LIKE ? OR phone LIKE ? OR serviceDescription LIKE ? OR applicationId LIKE ?)';
+      const q = `%${filters.search}%`;
+      params.push(q, q, q, q, q);
     }
     if (filters.category) { query += ' AND category = ?'; params.push(filters.category); }
     if (filters.status) { query += ' AND status = ?'; params.push(filters.status); }
@@ -199,13 +202,13 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('clients:get', async (_event, id) => getDb().prepare('SELECT * FROM clients WHERE id = ?').get(id));
+
   ipcMain.handle('clients:delete', async (_event, { id, removeFolder = false }) => {
     const db = getDb();
     const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
-    if (!client) {
-      throw new Error('Client not found');
-    }
+    if (!client) throw new Error('Client not found');
 
+    db.prepare('DELETE FROM applications WHERE clientId = ?').run(id);
     db.prepare('DELETE FROM clients WHERE id = ?').run(id);
 
     if (removeFolder && client.folderPath && fs.existsSync(client.folderPath)) {
@@ -219,36 +222,65 @@ function registerIpcHandlers() {
 
     return { success: true };
   });
-  ipcMain.handle('clients:update-status', async (_event, { id, status }) => {
-    if (!STATUS.includes(status)) throw new Error('Invalid status');
-    const db = getDb();
-    db.prepare('UPDATE clients SET status = ? WHERE id = ?').run(status, id);
-    return db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
-  });
 
   ipcMain.handle('clients:update', async (_event, payload) => {
     const db = getDb();
     db.prepare(`
-      UPDATE clients SET appointmentDate=@appointmentDate, serviceDescription=@serviceDescription, notes=@notes, phone=@phone
+      UPDATE clients
+      SET phone=@phone, serviceDescription=@serviceDescription, notes=@notes, applicationId=@applicationId, status=@status
       WHERE id=@id
     `).run(payload);
+
     return db.prepare('SELECT * FROM clients WHERE id = ?').get(payload.id);
   });
 
   ipcMain.handle('dashboard:stats', async () => {
     const db = getDb();
     const totalClients = db.prepare('SELECT COUNT(*) count FROM clients').get().count;
+    const totalApplications = db.prepare('SELECT COUNT(*) count FROM applications').get().count;
     const moroccan = db.prepare("SELECT COUNT(*) count FROM clients WHERE category='MOROCCAN_CONSULATE'").get().count;
     const other = db.prepare("SELECT COUNT(*) count FROM clients WHERE category='OTHER_SERVICES'").get().count;
-    const upcomingAppointments = db.prepare("SELECT COUNT(*) count FROM clients WHERE appointmentDate IS NOT NULL AND appointmentDate != '' AND date(appointmentDate) >= date('now')").get().count;
     const statusCounters = Object.fromEntries(STATUS.map(status => [status, db.prepare('SELECT COUNT(*) count FROM clients WHERE status = ?').get(status).count]));
-    return { totalClients, moroccan, other, upcomingAppointments, statusCounters };
+    return { totalClients, totalApplications, moroccan, other, statusCounters };
   });
 
-  ipcMain.handle('appointments:list', async () => getDb().prepare(`
-    SELECT id, fullName, nationalId, appointmentDate, category, status
-    FROM clients WHERE appointmentDate IS NOT NULL AND appointmentDate != '' ORDER BY date(appointmentDate) ASC
-  `).all());
+  ipcMain.handle('applications:list', async (_event, clientId) => {
+    return getDb().prepare('SELECT * FROM applications WHERE clientId = ? ORDER BY datetime(createdAt) DESC').all(clientId);
+  });
+
+  ipcMain.handle('applications:add', async (_event, payload) => {
+    const db = getDb();
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(payload.clientId);
+    if (!client) throw new Error('Client not found');
+
+    db.prepare(`
+      INSERT INTO applications (clientId, applicationId, serviceDescription, notes, status)
+      VALUES (@clientId, @applicationId, @serviceDescription, @notes, @status)
+    `).run({
+      clientId: payload.clientId,
+      applicationId: payload.applicationId || '',
+      serviceDescription: payload.serviceDescription || '',
+      notes: payload.notes || '',
+      status: payload.status || 'WAITING_DOCUMENTS'
+    });
+
+    db.prepare(`
+      UPDATE clients
+      SET applicationId = @applicationId,
+          serviceDescription = @serviceDescription,
+          notes = @notes,
+          status = @status
+      WHERE id = @clientId
+    `).run({
+      clientId: payload.clientId,
+      applicationId: payload.applicationId || '',
+      serviceDescription: payload.serviceDescription || '',
+      notes: payload.notes || '',
+      status: payload.status || 'WAITING_DOCUMENTS'
+    });
+
+    return { success: true };
+  });
 
   ipcMain.handle('documents:upload', async (_event, { clientId }) => {
     const client = getClientById(clientId);
@@ -266,9 +298,13 @@ function registerIpcHandlers() {
 
   ipcMain.handle('documents:open', async (_event, filePath) => shell.openPath(filePath));
   ipcMain.handle('documents:delete', async (_event, filePath) => deleteDocument(filePath));
-  ipcMain.handle('clients:open-folder', async (_event, folderPath) => { ensureFolder(folderPath); return shell.openPath(folderPath); });
-  ipcMain.handle('scans:list', async () => listScannedFiles(settings.scanFolderPath));
 
+  ipcMain.handle('clients:open-folder', async (_event, folderPath) => {
+    ensureFolder(folderPath);
+    return shell.openPath(folderPath);
+  });
+
+  ipcMain.handle('scans:list', async () => listScannedFiles(settings.scanFolderPath));
   ipcMain.handle('scans:import', async (_event, { clientId, sourcePath, documentType }) => {
     const client = getClientById(clientId);
     if (!client) throw new Error('Client not found');
@@ -277,7 +313,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('clients:export-csv', async () => {
     const rows = getDb().prepare('SELECT * FROM clients ORDER BY datetime(createdAt) DESC').all();
-    const headers = ['id', 'fullName', 'nationalId', 'phone', 'category', 'serviceDescription', 'appointmentDate', 'notes', 'status', 'folderPath', 'createdAt'];
+    const headers = ['id', 'fullName', 'nationalId', 'phone', 'category', 'applicationId', 'serviceDescription', 'notes', 'status', 'folderPath', 'createdAt'];
     const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => csvEscape(r[h])).join(','))).join('\n');
 
     const { canceled, filePath } = await dialog.showSaveDialog({

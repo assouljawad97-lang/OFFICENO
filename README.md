@@ -5,7 +5,7 @@ Officeno Admin Manager is a complete **offline Windows desktop application** bui
 
 It helps manage:
 - Client records
-- Moroccan consulate service requests and appointments
+- Moroccan consulate service requests and applications
 - Other Spanish administrative procedures
 - Scanned and uploaded documents stored in local client folders
 - Case progress via status tracking
@@ -17,12 +17,12 @@ Main service categories:
 Key workflows:
 - Create and search clients
 - Assign categories and service descriptions (passport renewal, NIE, empadronamiento, etc.)
-- Track appointment dates and case status
+- Track application IDs and case status
 - Upload files manually
 - Import files from a scanner folder (for example `C:/Scans`)
 - Open each client's folder directly in Windows Explorer
 - Export clients to CSV
-- View appointments in a calendar-style grouped list
+- View applications in a calendar-style grouped list
 
 ---
 
@@ -75,7 +75,7 @@ npm start
 - `phone`
 - `category`
 - `serviceDescription`
-- `appointmentDate`
+- `applicationId`
 - `notes`
 - `status`
 - `folderPath`
@@ -221,3 +221,10 @@ dist/
 - App is intentionally offline-first and local-storage only.
 - IPC APIs are exposed safely via preload (`window.api`).
 - Use `shell.openPath` for opening files/folders in Windows Explorer.
+
+
+## APPLICATION HISTORY
+Each client can have multiple applications over time.
+- In client details, use **Add Another Application** to append new service requests.
+- History keeps records of application ID, description, notes, status, and date.
+- Latest application is reflected on the main client record for quick filtering/search.

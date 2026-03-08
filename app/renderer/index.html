@@ -8,6 +8,15 @@
 </head>
 <body>
   <div id="toast-container"></div>
+
+  <div id="scan-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Scan Session Active</h3>
+      <p id="scan-modal-text">This client is now active for scanning. Scan now and all new scanned files will move directly to this client's folder.</p>
+      <button id="finish-scan-session" class="danger-btn">Click here to finish scanning</button>
+    </div>
+  </div>
+
   <header>
     <h1 data-i18n="appTitle">Officeno Admin Manager</h1>
     <div class="header-actions">
@@ -22,7 +31,6 @@
       <button data-view="dashboard" data-i18n="dashboard">Dashboard</button>
       <button data-view="add-client" data-i18n="addClient">Add Client</button>
       <button data-view="client-list" data-i18n="clientList">Client List</button>
-      <button data-view="calendar" data-i18n="calendar">Calendar</button>
       <button data-view="document-manager" data-i18n="documentManager">Document Manager</button>
       <button data-view="scanner-setup" data-i18n="scannerSetup">Scanner Setup</button>
     </nav>
@@ -44,14 +52,12 @@
               <option value="OTHER_SERVICES" data-i18n="otherServices">Other Administrative Services</option>
             </select>
           </label>
-          <label><span data-i18n="appointment">Appointment Date (optional)</span><input type="date" name="appointmentDate" /></label>
-          <label><span data-i18n="status">Status</span>
-            <select name="status" id="status-select-add"></select>
-          </label>
+          <label><span data-i18n="applicationId">Application ID</span><input name="applicationId" /></label>
+          <label><span data-i18n="status">Status</span><select name="status" id="status-select-add"></select></label>
         </div>
         <label><span data-i18n="serviceDescription">Service Description</span><textarea name="serviceDescription" required></textarea></label>
         <label><span data-i18n="notes">Notes</span><textarea name="notes"></textarea></label>
-        <button type="submit" data-i18n="createClient">Create Client</button>
+        <button type="submit" class="big-save" data-i18n="createClient">Save Client</button>
       </form>
       <p id="add-client-message"></p>
     </section>
@@ -59,7 +65,7 @@
     <section id="client-list" class="view hidden">
       <h2 data-i18n="clientList">Client List</h2>
       <div class="filters">
-        <input id="search-input" placeholder="Search by name, ID, phone, service" />
+        <input id="search-input" placeholder="Search by name, ID, phone, service, application ID" />
         <select id="filter-category"></select>
         <select id="filter-status"></select>
         <button id="export-csv" data-i18n="exportCsv">Export CSV</button>
@@ -67,7 +73,14 @@
       <table>
         <thead>
           <tr>
-            <th data-i18n="fullName">Name</th><th>ID</th><th data-i18n="phone">Phone</th><th data-i18n="category">Category</th><th data-i18n="serviceDescription">Service</th><th data-i18n="status">Status</th><th data-i18n="appointment">Appointment</th><th data-i18n="actions">Actions</th>
+            <th data-i18n="fullName">Name</th>
+            <th>ID</th>
+            <th data-i18n="phone">Phone</th>
+            <th data-i18n="applicationId">Application ID</th>
+            <th data-i18n="category">Category</th>
+            <th data-i18n="status">Status</th>
+            <th data-i18n="createdAt">Created</th>
+            <th data-i18n="actions">Actions</th>
           </tr>
         </thead>
         <tbody id="clients-table-body"></tbody>
@@ -77,11 +90,6 @@
     <section id="client-details" class="view hidden">
       <h2 data-i18n="clientDetails">Client Details</h2>
       <div id="client-details-content"></div>
-    </section>
-
-    <section id="calendar" class="view hidden">
-      <h2 data-i18n="calendar">Appointments Calendar View</h2>
-      <div id="calendar-list"></div>
     </section>
 
     <section id="document-manager" class="view hidden">
