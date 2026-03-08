@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   setActiveScannerClient: clientId => ipcRenderer.invoke('scanner:set-active-client', clientId),
   runScannerNow: () => ipcRenderer.invoke('scanner:scan-now'),
   createClient: payload => ipcRenderer.invoke('clients:create', payload),
+  deleteClient: payload => ipcRenderer.invoke('clients:delete', payload),
   listClients: filters => ipcRenderer.invoke('clients:list', filters),
   getClient: id => ipcRenderer.invoke('clients:get', id),
   updateClientStatus: payload => ipcRenderer.invoke('clients:update-status', payload),

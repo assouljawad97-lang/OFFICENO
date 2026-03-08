@@ -199,6 +199,26 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('clients:get', async (_event, id) => getDb().prepare('SELECT * FROM clients WHERE id = ?').get(id));
+  ipcMain.handle('clients:delete', async (_event, { id, removeFolder = false }) => {
+    const db = getDb();
+    const client = db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+
+    db.prepare('DELETE FROM clients WHERE id = ?').run(id);
+
+    if (removeFolder && client.folderPath && fs.existsSync(client.folderPath)) {
+      fs.rmSync(client.folderPath, { recursive: true, force: true });
+    }
+
+    if (Number(settings.activeClientId) === Number(id)) {
+      settings.activeClientId = null;
+      saveSettings();
+    }
+
+    return { success: true };
+  });
   ipcMain.handle('clients:update-status', async (_event, { id, status }) => {
     if (!STATUS.includes(status)) throw new Error('Invalid status');
     const db = getDb();

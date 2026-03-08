@@ -8,7 +8,7 @@ const translations = {
     importScans: 'Import Scanned Documents', refreshScanFolder: 'Refresh Scan Folder', scanFolder: 'Scan Folder Path', defaultDocType: 'Default Document Type',
     activeClient: 'Active Client for Auto-Scan', autoImport: 'Auto import scans', saveSettings: 'Save Scanner Settings', scanNow: 'Scan Now', scanLogs: 'Scan Logs',
     waiting: 'Waiting Documents', booked: 'Appointment Booked', completed: 'Completed', problem: 'Problem / Missing Document', openFolder: 'Open Folder',
-    details: 'Details', setActive: 'Set Active Scan Client'
+    details: 'Details', setActive: 'Set Active Scan Client', deleteClient: 'Delete Client', confirmDelete: 'Are you sure you want to delete this client?', deletedOk: 'Client deleted successfully.', addSuccess: 'Client added successfully. Folder was created automatically.', updateSuccess: 'Client details updated successfully.', statusSuccess: 'Client status updated.', scannerSaved: 'Scanner settings saved successfully.', activeClientSet: 'Active scan client updated.'
   },
   es: {
     appTitle: 'Gestor Administrativo Officeno', language: 'Idioma', dashboard: 'Panel', addClient: 'Añadir Cliente', clientList: 'Lista de Clientes',
@@ -19,7 +19,7 @@ const translations = {
     importScans: 'Importar documentos escaneados', refreshScanFolder: 'Actualizar carpeta de escaneo', scanFolder: 'Ruta de carpeta de escaneo', defaultDocType: 'Tipo por defecto',
     activeClient: 'Cliente activo para auto-escaneo', autoImport: 'Importar escaneos automáticamente', saveSettings: 'Guardar configuración', scanNow: 'Escanear ahora', scanLogs: 'Registro de escaneo',
     waiting: 'Esperando documentos', booked: 'Cita reservada', completed: 'Completado', problem: 'Problema / documento faltante', openFolder: 'Abrir carpeta',
-    details: 'Detalles', setActive: 'Establecer cliente activo'
+    details: 'Detalles', setActive: 'Establecer cliente activo', deleteClient: 'Eliminar cliente', confirmDelete: '¿Seguro que deseas eliminar este cliente?', deletedOk: 'Cliente eliminado correctamente.', addSuccess: 'Cliente creado correctamente. La carpeta fue creada automáticamente.', updateSuccess: 'Datos del cliente actualizados.', statusSuccess: 'Estado del cliente actualizado.', scannerSaved: 'Configuración del escáner guardada.', activeClientSet: 'Cliente activo actualizado.'
   },
   ar: {
     appTitle: 'مدير أوفيسينو الإداري', language: 'اللغة', dashboard: 'لوحة التحكم', addClient: 'إضافة عميل', clientList: 'قائمة العملاء',
@@ -30,7 +30,7 @@ const translations = {
     importScans: 'استيراد المستندات الممسوحة', refreshScanFolder: 'تحديث مجلد المسح', scanFolder: 'مسار مجلد المسح', defaultDocType: 'نوع المستند الافتراضي',
     activeClient: 'العميل النشط للمسح التلقائي', autoImport: 'استيراد تلقائي', saveSettings: 'حفظ الإعدادات', scanNow: 'تنفيذ المسح الآن', scanLogs: 'سجل المسح',
     waiting: 'بانتظار المستندات', booked: 'تم حجز الموعد', completed: 'مكتمل', problem: 'مشكلة / مستند ناقص', openFolder: 'فتح المجلد',
-    details: 'تفاصيل', setActive: 'تعيين عميل المسح'
+    details: 'تفاصيل', setActive: 'تعيين عميل المسح', deleteClient: 'حذف العميل', confirmDelete: 'هل أنت متأكد من حذف هذا العميل؟', deletedOk: 'تم حذف العميل بنجاح.', addSuccess: 'تمت إضافة العميل بنجاح وتم إنشاء المجلد تلقائيًا.', updateSuccess: 'تم تحديث بيانات العميل.', statusSuccess: 'تم تحديث حالة العميل.', scannerSaved: 'تم حفظ إعدادات الماسح.', activeClientSet: 'تم تعيين العميل النشط للمسح.'
   }
 };
 
@@ -46,6 +46,20 @@ const statusLabels = () => ({
 });
 
 function t(key) { return (translations[currentLang] && translations[currentLang][key]) || translations.en[key] || key; }
+
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('visible'), 30);
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 250);
+  }, 2600);
+}
+
 function applyTranslations() {
   document.documentElement.lang = currentLang;
   document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
@@ -100,15 +114,31 @@ async function loadClients() {
         <button onclick="openDetails(${client.id})">${t('details')}</button>
         <button onclick="openFolder('${client.folderPath.replace(/\\/g, '\\\\')}')">📁 ${t('openFolder')}</button>
         <button onclick="setActiveClient(${client.id})">🎯 ${t('setActive')}</button>
+        <button class="danger-btn" onclick="deleteClient(${client.id})">🗑️ ${t('deleteClient')}</button>
       </td>
     </tr>`).join('');
 }
 
 async function setActiveClient(id) {
   await window.api.setActiveScannerClient(id);
-  alert('Active scan client updated.');
+  showToast(t('activeClientSet'));
 }
 window.setActiveClient = setActiveClient;
+
+async function deleteClient(id = selectedClientId) {
+  if (!confirm(t('confirmDelete'))) return;
+  const removeFolder = confirm('Also delete this client folder and files?');
+  await window.api.deleteClient({ id, removeFolder });
+  showToast(t('deletedOk'), 'warn');
+  if (selectedClientId === id) {
+    selectedClientId = null;
+    showView('client-list');
+  }
+  await loadClients();
+  await loadDashboard();
+  await loadScannerSettings();
+}
+window.deleteClient = deleteClient;
 
 async function openFolder(folderPath) { await window.api.openClientFolder(folderPath); }
 window.openFolder = openFolder;
@@ -130,6 +160,7 @@ async function openDetails(id) {
     <button onclick="saveClientDetails()">Save</button>
     <button onclick="changeStatus()">${t('status')}</button>
     <button onclick="setActiveClient(${client.id})">🎯 ${t('setActive')}</button>
+        <button class="danger-btn" onclick="deleteClient(${client.id})">🗑️ ${t('deleteClient')}</button>
     <button onclick="openFolder('${client.folderPath.replace(/\\/g, '\\\\')}')">📁 ${t('openFolder')}</button>
     <button onclick="uploadDocs()">📂 Upload</button>
     <h3>Documents</h3>
@@ -148,9 +179,10 @@ async function saveClientDetails() {
     notes: document.getElementById('detail-notes').value
   });
   await openDetails(selectedClientId);
+  showToast(t('updateSuccess'));
 }
 window.saveClientDetails = saveClientDetails;
-async function changeStatus() { await window.api.updateClientStatus({ id: selectedClientId, status: document.getElementById('detail-status').value }); await openDetails(selectedClientId); }
+async function changeStatus() { await window.api.updateClientStatus({ id: selectedClientId, status: document.getElementById('detail-status').value }); await openDetails(selectedClientId); showToast(t('statusSuccess')); }
 window.changeStatus = changeStatus;
 async function uploadDocs() { await window.api.uploadDocuments({ clientId: selectedClientId }); await openDetails(selectedClientId); }
 window.uploadDocs = uploadDocs;
@@ -210,7 +242,8 @@ function wireEvents() {
     e.preventDefault();
     const payload = Object.fromEntries(new FormData(e.target).entries());
     await window.api.createClient(payload);
-    document.getElementById('add-client-message').textContent = 'Client created successfully.';
+    document.getElementById('add-client-message').textContent = t('addSuccess');
+    showToast(t('addSuccess'));
     e.target.reset();
     await loadClients();
   });
@@ -221,7 +254,7 @@ function wireEvents() {
   });
 
   document.getElementById('refresh-scans').addEventListener('click', loadScans);
-  document.getElementById('export-csv').addEventListener('click', async () => { const filePath = await window.api.exportClientsCsv(); if (filePath) alert(`CSV exported: ${filePath}`); });
+  document.getElementById('export-csv').addEventListener('click', async () => { const filePath = await window.api.exportClientsCsv(); if (filePath) showToast(`CSV exported: ${filePath}`); });
 
   document.getElementById('save-scanner-settings').addEventListener('click', async () => {
     await window.api.updateSettings({
@@ -232,7 +265,7 @@ function wireEvents() {
       language: currentLang
     });
     await loadScannerSettings();
-    alert('Scanner settings saved.');
+    showToast(t('scannerSaved'));
   });
 
   document.getElementById('run-scan-now').addEventListener('click', async () => {
